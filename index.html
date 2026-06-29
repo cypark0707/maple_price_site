@@ -2,82 +2,81 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>게임 시세</title>
+  <title>메이플 시세</title>
 </head>
 <body>
 
-<h2>게임 시세 업로드</h2>
+<h2>메이플 시세 (manifest 버전)</h2>
 
-<input type="file" id="fileInput" multiple />
-<button onclick="clearData()">초기화</button>
+<button onclick="loadAll()">데이터 불러오기</button>
 
 <table border="1" id="table"></table>
 
 <script>
 
-let data = JSON.parse(localStorage.getItem("priceData") || "[]");
+// =============================
+// 1. 로그 파싱
+// =============================
+function parseLine(line) {
+  const time = line.match(/^([\d\.\/:]+)/)?.[1] || "";
+  const item = line.match(/\[(.*?)\]/)?.[1] || "";
+  const count = line.match(/] (\d+)개/)?.[1] || "1";
+  const price = line.match(/총합 ([\d,]+) 메소/)?.[1] || "0";
 
-function render() {
+  return { time, item, count, price };
+}
+
+// =============================
+// 2. manifest 읽기 → 파일 목록 자동 로드
+// =============================
+function loadAll() {
+  fetch("manifest.json")
+    .then(res => res.json())
+    .then(files => {
+
+      return Promise.all(
+        files.map(f => fetch(f).then(r => r.text()))
+      );
+
+    })
+    .then(allTexts => {
+
+      const allLines = allTexts.join("\n").split("\n");
+
+      const data = allLines
+        .filter(l => l.includes("[") && l.includes("총합"))
+        .map(parseLine);
+
+      render(data);
+    });
+}
+
+// =============================
+// 3. 화면 출력
+// =============================
+function render(data) {
   const table = document.getElementById("table");
 
   table.innerHTML = `
     <tr>
+      <th>시간</th>
       <th>아이템</th>
+      <th>개수</th>
       <th>가격</th>
-      <th>날짜</th>
     </tr>
   `;
 
-  const now = new Date();
-
   data.forEach(d => {
-    const diff = (now - new Date(d.date)) / (1000*60*60*24);
-
-    if (diff <= 90) {
-      table.innerHTML += `
-        <tr>
-          <td>${d.item}</td>
-          <td>${d.price}</td>
-          <td>${d.date}</td>
-        </tr>
-      `;
-    }
+    table.innerHTML += `
+      <tr>
+        <td>${d.time}</td>
+        <td>${d.item}</td>
+        <td>${d.count}</td>
+        <td>${d.price}</td>
+      </tr>
+    `;
   });
-
-  localStorage.setItem("priceData", JSON.stringify(data));
 }
-
-document.getElementById("fileInput").addEventListener("change", function(e) {
-  Array.from(e.target.files).forEach(file => {
-    const reader = new FileReader();
-
-    reader.onload = function(evt) {
-      evt.target.result.split("\n").forEach(line => {
-        const p = line.trim().split(/[\s,]+/);
-
-        if (p.length >= 2) {
-          data.push({
-            item: p[0],
-            price: parseInt(p[1]),
-            date: new Date().toISOString().split("T")[0]
-          });
-        }
-      });
-
-      render();
-    };
-
-    reader.readAsText(file);
-  });
-});
-
-function clearData() {
-  data = [];
-  localStorage.removeItem("priceData");
-  render();
-}
-
-render();
 
 </script>
 
