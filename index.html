@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>게임 시세</title>
+</head>
+<body>
+
+<h2>게임 시세 업로드</h2>
+
+<input type="file" id="fileInput" multiple />
+<button onclick="clearData()">초기화</button>
+
+<table border="1" id="table"></table>
+
+<script>
+
+let data = JSON.parse(localStorage.getItem("priceData") || "[]");
+
+function render() {
+  const table = document.getElementById("table");
+
+  table.innerHTML = `
+    <tr>
+      <th>아이템</th>
+      <th>가격</th>
+      <th>날짜</th>
+    </tr>
+  `;
+
+  const now = new Date();
+
+  data.forEach(d => {
+    const diff = (now - new Date(d.date)) / (1000*60*60*24);
+
+    if (diff <= 90) {
+      table.innerHTML += `
+        <tr>
+          <td>${d.item}</td>
+          <td>${d.price}</td>
+          <td>${d.date}</td>
+        </tr>
+      `;
+    }
+  });
+
+  localStorage.setItem("priceData", JSON.stringify(data));
+}
+
+document.getElementById("fileInput").addEventListener("change", function(e) {
+  Array.from(e.target.files).forEach(file => {
+    const reader = new FileReader();
+
+    reader.onload = function(evt) {
+      evt.target.result.split("\n").forEach(line => {
+        const p = line.trim().split(/[\s,]+/);
+
+        if (p.length >= 2) {
+          data.push({
+            item: p[0],
+            price: parseInt(p[1]),
+            date: new Date().toISOString().split("T")[0]
+          });
+        }
+      });
+
+      render();
+    };
+
+    reader.readAsText(file);
+  });
+});
+
+function clearData() {
+  data = [];
+  localStorage.removeItem("priceData");
+  render();
+}
+
+render();
+
+</script>
+
+</body>
+</html>
